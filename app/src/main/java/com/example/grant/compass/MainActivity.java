@@ -55,6 +55,7 @@ public class MainActivity
     private float bearingToNorth = 0f;
     private float bearingFromNorthToDestination = 0f;
     private float bearingToDestination = 0f;
+    private float distanceToDestination = 0f;
 
 
     private GoogleApiClient googleApiClient;
@@ -99,6 +100,11 @@ public class MainActivity
         // Create location request
         myLocationRequest = new LocationRequest();
         myLocationRequest.setInterval(2000).setFastestInterval(1000).setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+
+        // Create location to point to
+        destination = new Location("");
+        destination.setLongitude(-88.146155);
+        destination.setLatitude(42.144821);
 
     }
 
@@ -167,47 +173,43 @@ public class MainActivity
     }
 
     private void updateOrientationAngles() {
-        sensorManager.getRotationMatrix(
-                rotationMatrix,
-                null,
-                accelReading,
-                magReading);
-        sensorManager.getOrientation(
-                rotationMatrix,
-                orientationAngles);
-
+        // Get sensor data
+        sensorManager.getRotationMatrix(rotationMatrix, null, accelReading, magReading);
+        sensorManager.getOrientation(rotationMatrix, orientationAngles);
         float azimuth = orientationAngles[0];
         float pitch = orientationAngles[1];
         float roll = orientationAngles[2];
 
-        float newBearingToNorth = (float)Math.toDegrees(azimuth) * -1;
-        if (newBearingToNorth < 0) newBearingToNorth += 360;
+        // Calculate bearing to north based on updated sensor info
+        bearingToNorth = (float)Math.toDegrees(azimuth);
+        if (bearingToNorth < 0) bearingToNorth += 360;
         // Add geomagnetic field to fix difference between true north and magnetic north
 
-        bearingToDestination = newBearingToNorth - bearingFromNorthToDestination;
-        if (bearingToDestination < 0 ) bearingToDestination += 360;
+        // Calculate bearing to destination based on updated bearing to north
+        float newBearingToDestination = bearingToNorth - bearingFromNorthToDestination;
+        if (newBearingToDestination < 0 ) newBearingToDestination += 360;
 
+        // Output text to screen
         DecimalFormat df = new DecimalFormat("0");
-        String text = "Heading relative to north: " + df.format(newBearingToNorth) + "\n"
+        String text = "Heading relative to north: " + df.format(bearingToNorth) + "\n"
             + "Degrees from north to destination: " + df.format(bearingFromNorthToDestination) + "\n"
-            + "Degrees to destination: " + df.format(bearingToDestination);
+            + "Degrees to destination: " + df.format(newBearingToDestination) + "\n"
+            + "Distance to destination: " + df.format(distanceToDestination) + " meters";
         tvHeading.setText(text);
 
+        // Rotate image
         RotateAnimation ra = new RotateAnimation(
-                bearingToNorth,
-                newBearingToNorth,
-                Animation.RELATIVE_TO_SELF,
-                0.5f,
-                Animation.RELATIVE_TO_SELF,
-                0.5f
+                -1 * bearingToDestination,  // *-1 because need to rotate image opposite direction the phone is turning
+                -1 * newBearingToDestination,
+                Animation.RELATIVE_TO_SELF, 0.5f,
+                Animation.RELATIVE_TO_SELF, 0.5f
         );
-        ra.setDuration(200);
+        ra.setDuration(25);
         ra.setFillAfter(true);
         image.startAnimation(ra);
 
-        bearingToNorth = newBearingToNorth;
-
-
+        // Save new bearing as current bearing
+        bearingToDestination = newBearingToDestination;
 
     }
 
@@ -262,12 +264,6 @@ public class MainActivity
             myLongitude = myLocation.getLongitude();
         }
 
-
-        // Create location to point to
-        destination = new Location("");
-        destination.setLongitude(-78);
-        destination.setLatitude(42);
-
     }
 
     @Override
@@ -288,6 +284,7 @@ public class MainActivity
         myLatitude = myLocation.getLatitude();
 
         bearingFromNorthToDestination = myLocation.bearingTo(destination);
+        distanceToDestination = myLocation.distanceTo(destination);
 
         showLocation();
     }
