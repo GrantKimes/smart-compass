@@ -1,6 +1,5 @@
 package com.example.grant.compass;
 
-import android.*;
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
@@ -23,6 +22,8 @@ import android.widget.TextView;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.location.LocationListener;
+import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 
 import java.text.DecimalFormat;
@@ -31,7 +32,8 @@ public class MainActivity
         extends AppCompatActivity
         implements SensorEventListener,
             GoogleApiClient.ConnectionCallbacks,
-            GoogleApiClient.OnConnectionFailedListener
+            GoogleApiClient.OnConnectionFailedListener,
+            LocationListener
 {
 
     private static final String TAG = "MainActivity";
@@ -50,13 +52,17 @@ public class MainActivity
     private float[] rotationMatrix = new float[9];
     private float[] orientationAngles = new float[3];
 
-    private float currBearing = 0f;
+    private float bearingToNorth = 0f;
+    private float bearingFromNorthToDestination = 0f;
+    private float bearingToDestination = 0f;
 
 
     private GoogleApiClient googleApiClient;
     private Location myLocation;
+    private Location destination;
     private double myLatitude;
     private double myLongitude;
+    private LocationRequest myLocationRequest;
 
 
 
@@ -64,7 +70,7 @@ public class MainActivity
 
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState) { // Implement onSaveInstanceState()
         super.onCreate(savedInstanceState);
         Log.i(TAG, "CREATE");
 
@@ -90,6 +96,10 @@ public class MainActivity
                     .build();
         }
 
+        // Create location request
+        myLocationRequest = new LocationRequest();
+        myLocationRequest.setInterval(2000).setFastestInterval(1000).setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+
     }
 
 
@@ -105,6 +115,7 @@ public class MainActivity
     protected void onStop() {
         super.onStop();
         Log.i(TAG, "STOP");
+
         googleApiClient.disconnect();
     }
 
@@ -113,7 +124,7 @@ public class MainActivity
         super.onResume();
         Log.i(TAG, "RESUME");
 
-
+        // Orientation listeners
         sensorManager.registerListener(
                 this,
                 sensorAccelerometer,
@@ -129,6 +140,8 @@ public class MainActivity
     protected void onPause() {
         super.onPause();
         Log.i(TAG, "PAUSE");
+
+        LocationServices.FusedLocationApi.removeLocationUpdates(googleApiClient, this);
         sensorManager.unregisterListener(this);
     }
 
@@ -167,16 +180,22 @@ public class MainActivity
         float pitch = orientationAngles[1];
         float roll = orientationAngles[2];
 
-        double bearing = Math.toDegrees(azimuth);
+        float newBearingToNorth = (float)Math.toDegrees(azimuth) * -1;
+        if (newBearingToNorth < 0) newBearingToNorth += 360;
         // Add geomagnetic field to fix difference between true north and magnetic north
-        if (bearing < 0) bearing += 360;
 
-        DecimalFormat df = new DecimalFormat("#.0");
-        tvHeading.setText("Heading: " + df.format(bearing));
+        bearingToDestination = newBearingToNorth - bearingFromNorthToDestination;
+        if (bearingToDestination < 0 ) bearingToDestination += 360;
+
+        DecimalFormat df = new DecimalFormat("0");
+        String text = "Heading relative to north: " + df.format(newBearingToNorth) + "\n"
+            + "Degrees from north to destination: " + df.format(bearingFromNorthToDestination) + "\n"
+            + "Degrees to destination: " + df.format(bearingToDestination);
+        tvHeading.setText(text);
 
         RotateAnimation ra = new RotateAnimation(
-                currBearing,
-                (float)-bearing,
+                bearingToNorth,
+                newBearingToNorth,
                 Animation.RELATIVE_TO_SELF,
                 0.5f,
                 Animation.RELATIVE_TO_SELF,
@@ -186,7 +205,7 @@ public class MainActivity
         ra.setFillAfter(true);
         image.startAnimation(ra);
 
-        currBearing = (float)-bearing;
+        bearingToNorth = newBearingToNorth;
 
 
 
@@ -215,39 +234,39 @@ public class MainActivity
         return existingArr;
     }
 
+    private void checkAppPermission(String permission) {
+        if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+            Log.d(TAG, "Permission denied");
+            if (ActivityCompat.shouldShowRequestPermissionRationale(this, permission)) {
+                Log.d(TAG, "In shouldShowRequest");
+            } else {
+                Log.d(TAG, "Else from shouldShow");
+                ActivityCompat.requestPermissions(this, new String[] {permission}, 1);
+            }
+        }
+
+    }
+
     @Override
     public void onConnected(@Nullable Bundle bundle) {
         Log.i(TAG, "ON CONNECTED");
 
-        // Get my location.
-        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            Log.d(TAG, "Permission denied");
-            if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION)) {
-                Log.d(TAG, "In shouldShowRequest");
-            } else {
-                Log.d(TAG, "Else from shouldShow");
-                ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.ACCESS_FINE_LOCATION}, 1);
-            }
-        }
+        // Get location permissions.
+        checkAppPermission(Manifest.permission.ACCESS_FINE_LOCATION);
+        LocationServices.FusedLocationApi.requestLocationUpdates(googleApiClient, myLocationRequest, this);
 
+        // Get location.
         myLocation = LocationServices.FusedLocationApi.getLastLocation(googleApiClient);
         if (myLocation != null) {
             myLatitude = myLocation.getLatitude();
             myLongitude = myLocation.getLongitude();
         }
 
-        Log.i(TAG, "LAT:" + String.valueOf(myLatitude));
-        Log.i(TAG, "LONG: " + String.valueOf(myLongitude));
-
 
         // Create location to point to
-        Location destination = new Location("");
-        destination.setLatitude(50.0);
-        destination.setLongitude(-90.0);
-
-        double bearing = myLocation.bearingTo(destination);
-        Log.d(TAG, String.valueOf(bearing));
-
+        destination = new Location("");
+        destination.setLongitude(-78);
+        destination.setLatitude(42);
 
     }
 
@@ -259,5 +278,24 @@ public class MainActivity
     @Override
     public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
         Log.i(TAG, "ON CONNECTION FAILED");
+    }
+
+    @Override
+    public void onLocationChanged(Location newLocation) {
+        //Log.i(TAG, "LOCATION CHANGED");
+        myLocation = newLocation;
+        myLongitude = myLocation.getLongitude();
+        myLatitude = myLocation.getLatitude();
+
+        bearingFromNorthToDestination = myLocation.bearingTo(destination);
+
+        showLocation();
+    }
+
+    private void showLocation() {
+        Log.d(TAG, "(LONG, LAT):" + String.valueOf(myLongitude) + ", " + String.valueOf(myLatitude) + ")");
+
+        //double bearing = myLocation.bearingTo(destination);
+        //Log.d(TAG, "bearing to destination: " + String.valueOf(bearing));
     }
 }
