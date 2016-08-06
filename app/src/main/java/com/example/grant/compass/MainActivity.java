@@ -211,7 +211,7 @@ public class MainActivity
 
 
         // Calculate bearing to destination based on updated bearing to north
-        float newBearingToDestination = bearingMagNorth - bearingFromNorthToDestination;
+        float newBearingToDestination = bearingTrueNorth - bearingFromNorthToDestination;
         if (newBearingToDestination < 0 ) newBearingToDestination += 360;
 
         // Output text to screen
