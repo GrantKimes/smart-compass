@@ -2,7 +2,9 @@ package com.example.grant.compass;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.hardware.GeomagneticField;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -15,8 +17,10 @@ import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.view.animation.Animation;
 import android.view.animation.RotateAnimation;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -52,7 +56,8 @@ public class MainActivity
     private float[] rotationMatrix = new float[9];
     private float[] orientationAngles = new float[3];
 
-    private float bearingToNorth = 0f;
+    private float bearingMagNorth = 0f;
+    private float bearingTrueNorth = 0f;
     private float bearingFromNorthToDestination = 0f;
     private float bearingToDestination = 0f;
     private float distanceToDestination = 0f;
@@ -63,6 +68,8 @@ public class MainActivity
     private Location destination;
     private double myLatitude;
     private double myLongitude;
+    private double myAltitude;
+    private long myTime;
     private LocationRequest myLocationRequest;
 
 
@@ -105,6 +112,16 @@ public class MainActivity
         destination = new Location("");
         destination.setLongitude(-88.146155);
         destination.setLatitude(42.144821);
+
+        // Set button listener for screen switch
+        Button nextScreenButton = (Button) findViewById(R.id.switch_view_button);
+        nextScreenButton.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View view) {
+                Log.d(TAG, "CLICKED BUTTON");
+                Intent nextScreen = new Intent(getApplicationContext(), MapFragment.class);
+                startActivity(nextScreen);
+            }
+        });
 
     }
 
@@ -160,7 +177,6 @@ public class MainActivity
             accelReading[0] = smoothed[0];
             accelReading[1] = smoothed[1];
             accelReading[2] = smoothed[2];
-            Log.v(TAG, "SMOOTHED: " + smoothed[0]);
         }
         else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
             smoothed = lowPassFilter(event.values, magReading);
@@ -169,29 +185,39 @@ public class MainActivity
             magReading[2] = smoothed[2];
         }
 
-        updateOrientationAngles();
+        if (myLocation != null) {
+            updateOrientationAngles();
+        }
     }
 
     private void updateOrientationAngles() {
         // Get sensor data
         sensorManager.getRotationMatrix(rotationMatrix, null, accelReading, magReading);
         sensorManager.getOrientation(rotationMatrix, orientationAngles);
-        float azimuth = orientationAngles[0];
-        float pitch = orientationAngles[1];
-        float roll = orientationAngles[2];
+        float azimuth = (float)Math.toDegrees(orientationAngles[0]);
+        float pitch = (float)Math.toDegrees(orientationAngles[1]);
+        float roll = (float)Math.toDegrees(orientationAngles[2]);
 
         // Calculate bearing to north based on updated sensor info
-        bearingToNorth = (float)Math.toDegrees(azimuth);
-        if (bearingToNorth < 0) bearingToNorth += 360;
+        bearingMagNorth = azimuth;
+        if (bearingMagNorth < 0) bearingMagNorth += 360;
+
         // Add geomagnetic field to fix difference between true north and magnetic north
+        GeomagneticField geoField = new GeomagneticField((float)myLatitude, (float)myLongitude, (float)myAltitude, myTime);
+        azimuth -= geoField.getDeclination();
+        bearingTrueNorth = azimuth;
+        if (bearingTrueNorth < 0) bearingTrueNorth += 360;
+
+
 
         // Calculate bearing to destination based on updated bearing to north
-        float newBearingToDestination = bearingToNorth - bearingFromNorthToDestination;
+        float newBearingToDestination = bearingMagNorth - bearingFromNorthToDestination;
         if (newBearingToDestination < 0 ) newBearingToDestination += 360;
 
         // Output text to screen
         DecimalFormat df = new DecimalFormat("0");
-        String text = "Heading relative to north: " + df.format(bearingToNorth) + "\n"
+        String text = "Magnetic north: " + df.format(bearingMagNorth) + "\n"
+            + "True north: " + df.format(bearingTrueNorth) + "\n"
             + "Degrees from north to destination: " + df.format(bearingFromNorthToDestination) + "\n"
             + "Degrees to destination: " + df.format(newBearingToDestination) + "\n"
             + "Distance to destination: " + df.format(distanceToDestination) + " meters";
@@ -282,6 +308,9 @@ public class MainActivity
         myLocation = newLocation;
         myLongitude = myLocation.getLongitude();
         myLatitude = myLocation.getLatitude();
+        myAltitude = myLocation.getAltitude();
+        myTime = myLocation.getTime();
+
 
         bearingFromNorthToDestination = myLocation.bearingTo(destination);
         distanceToDestination = myLocation.distanceTo(destination);
@@ -290,7 +319,7 @@ public class MainActivity
     }
 
     private void showLocation() {
-        Log.d(TAG, "(LONG, LAT):" + String.valueOf(myLongitude) + ", " + String.valueOf(myLatitude) + ")");
+        //Log.d(TAG, "(LONG, LAT):" + String.valueOf(myLongitude) + ", " + String.valueOf(myLatitude) + ")");
 
         //double bearing = myLocation.bearingTo(destination);
         //Log.d(TAG, "bearing to destination: " + String.valueOf(bearing));
