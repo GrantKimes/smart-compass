@@ -118,7 +118,7 @@ public class MainActivity
         nextScreenButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View view) {
                 Log.d(TAG, "CLICKED BUTTON");
-                Intent nextScreen = new Intent(getApplicationContext(), MapFragment.class);
+                Intent nextScreen = new Intent(getApplicationContext(), MapActivity.class);
                 startActivity(nextScreen);
             }
         });
@@ -200,13 +200,12 @@ public class MainActivity
 
         // Calculate bearing to north based on updated sensor info
         bearingMagNorth = azimuth;
-        if (bearingMagNorth < 0) bearingMagNorth += 360;
 
         // Add geomagnetic field to fix difference between true north and magnetic north
         GeomagneticField geoField = new GeomagneticField((float)myLatitude, (float)myLongitude, (float)myAltitude, myTime);
-        azimuth -= geoField.getDeclination();
-        bearingTrueNorth = azimuth;
+        bearingTrueNorth = azimuth + geoField.getDeclination();
         if (bearingTrueNorth < 0) bearingTrueNorth += 360;
+        if (bearingMagNorth < 0) bearingMagNorth += 360;
 
 
 
@@ -218,11 +217,13 @@ public class MainActivity
         DecimalFormat df = new DecimalFormat("0");
         String text = "Magnetic north: " + df.format(bearingMagNorth) + "\n"
             + "True north: " + df.format(bearingTrueNorth) + "\n"
+            + "Geo declination: " + df.format(geoField.getDeclination()) + "\n"
             + "Degrees from north to destination: " + df.format(bearingFromNorthToDestination) + "\n"
             + "Degrees to destination: " + df.format(newBearingToDestination) + "\n"
             + "Distance to destination: " + df.format(distanceToDestination) + " meters";
         tvHeading.setText(text);
 
+        // Try matrix.postRotate()
         // Rotate image
         RotateAnimation ra = new RotateAnimation(
                 -1 * bearingToDestination,  // *-1 because need to rotate image opposite direction the phone is turning
