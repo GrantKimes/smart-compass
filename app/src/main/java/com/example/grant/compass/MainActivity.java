@@ -41,6 +41,8 @@ public class MainActivity
 {
 
     private static final String TAG = "MainActivity";
+    private static final int DESTINATION_REQUEST = 100;
+
     private ImageView image;
     private float currDegree = 0;
     private SensorManager sensorManager;
@@ -72,9 +74,8 @@ public class MainActivity
     private long myTime;
     private LocationRequest myLocationRequest;
 
-
-
-
+    private DecimalFormat df = new DecimalFormat("0");
+    private DecimalFormat df2 = new DecimalFormat("0.00");
 
 
     @Override
@@ -119,10 +120,25 @@ public class MainActivity
             public void onClick(View view) {
                 Log.d(TAG, "CLICKED BUTTON");
                 Intent nextScreen = new Intent(getApplicationContext(), MapActivity.class);
-                startActivity(nextScreen);
+                nextScreen.putExtra("Latitude", myLatitude);
+                nextScreen.putExtra("Longitude", myLongitude);
+                startActivityForResult(nextScreen, DESTINATION_REQUEST);
             }
         });
 
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        Log.i(TAG, "ON ACTIVITY RESULT");
+        if (requestCode == DESTINATION_REQUEST) {
+            if (resultCode == RESULT_OK) {
+                double lat = data.getDoubleExtra("Latitude", 0);
+                Log.d(TAG, "RESULT LATITUDE: " + String.valueOf(lat));
+                destination.setLatitude(data.getDoubleExtra("Latitude", 0));
+                destination.setLongitude(data.getDoubleExtra("Longitude", 0));
+            }
+        }
     }
 
 
@@ -214,13 +230,13 @@ public class MainActivity
         if (newBearingToDestination < 0 ) newBearingToDestination += 360;
 
         // Output text to screen
-        DecimalFormat df = new DecimalFormat("0");
         String text = "Magnetic north: " + df.format(bearingMagNorth) + "\n"
-            + "True north: " + df.format(bearingTrueNorth) + "\n"
-            + "Geo declination: " + df.format(geoField.getDeclination()) + "\n"
-            + "Degrees from north to destination: " + df.format(bearingFromNorthToDestination) + "\n"
-            + "Degrees to destination: " + df.format(newBearingToDestination) + "\n"
-            + "Distance to destination: " + df.format(distanceToDestination) + " meters";
+                + "True north: " + df.format(bearingTrueNorth) + "\n"
+                //+ "Geo declination: " + df.format(geoField.getDeclination()) + "\n"
+                //+ "Degrees from north to destination: " + df.format(bearingFromNorthToDestination) + "\n"
+                //+ "Degrees to destination: " + df.format(newBearingToDestination) + "\n"
+                + "Distance to destination: " + df.format(distanceToDestination) + " meters \n"
+                + "Destination: (" + df2.format(destination.getLongitude()) + ", " + df2.format(destination.getLatitude()) + ")\n";
         tvHeading.setText(text);
 
         // Try matrix.postRotate()
@@ -305,7 +321,7 @@ public class MainActivity
 
     @Override
     public void onLocationChanged(Location newLocation) {
-        //Log.i(TAG, "LOCATION CHANGED");
+        Log.v(TAG, "LOCATION CHANGED");
         myLocation = newLocation;
         myLongitude = myLocation.getLongitude();
         myLatitude = myLocation.getLatitude();
@@ -316,13 +332,6 @@ public class MainActivity
         bearingFromNorthToDestination = myLocation.bearingTo(destination);
         distanceToDestination = myLocation.distanceTo(destination);
 
-        showLocation();
     }
 
-    private void showLocation() {
-        //Log.d(TAG, "(LONG, LAT):" + String.valueOf(myLongitude) + ", " + String.valueOf(myLatitude) + ")");
-
-        //double bearing = myLocation.bearingTo(destination);
-        //Log.d(TAG, "bearing to destination: " + String.valueOf(bearing));
-    }
 }
