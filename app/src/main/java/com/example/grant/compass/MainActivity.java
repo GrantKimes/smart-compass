@@ -110,9 +110,9 @@ public class MainActivity
         myLocationRequest.setInterval(2000).setFastestInterval(1000).setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
 
         // Create location to point to
-        destination = new Location("");
-        destination.setLongitude(-88.146155);
-        destination.setLatitude(42.144821);
+        //destination = new Location("");
+        //destination.setLongitude(-88.146155);
+        //destination.setLatitude(42.144821);
 
         // Set button listener for screen switch
         Button nextScreenButton = (Button) findViewById(R.id.switch_view_button);
@@ -133,10 +133,18 @@ public class MainActivity
         Log.i(TAG, "ON ACTIVITY RESULT");
         if (requestCode == DESTINATION_REQUEST) {
             if (resultCode == RESULT_OK) {
-                double lat = data.getDoubleExtra("Latitude", 0);
-                Log.d(TAG, "RESULT LATITUDE: " + String.valueOf(lat));
-                destination.setLatitude(data.getDoubleExtra("Latitude", 0));
-                destination.setLongitude(data.getDoubleExtra("Longitude", 0));
+
+                if (data.getBooleanExtra("DESTINATION_SELECTED", true)) {
+                    // Set location selected as new destination.
+                    double lat = data.getDoubleExtra("Latitude", 0);
+                    Log.d(TAG, "RESULT LATITUDE: " + String.valueOf(lat));
+                    destination = new Location("");
+                    destination.setLatitude(data.getDoubleExtra("Latitude", 0));
+                    destination.setLongitude(data.getDoubleExtra("Longitude", 0));
+                }
+                else {
+                    // Leave current location as destination.
+                }
             }
         }
     }
@@ -208,8 +216,8 @@ public class MainActivity
 
     private void updateOrientationAngles() {
         // Get sensor data
-        sensorManager.getRotationMatrix(rotationMatrix, null, accelReading, magReading);
-        sensorManager.getOrientation(rotationMatrix, orientationAngles);
+        SensorManager.getRotationMatrix(rotationMatrix, null, accelReading, magReading);
+        SensorManager.getOrientation(rotationMatrix, orientationAngles);
         float azimuth = (float)Math.toDegrees(orientationAngles[0]);
         float pitch = (float)Math.toDegrees(orientationAngles[1]);
         float roll = (float)Math.toDegrees(orientationAngles[2]);
@@ -224,19 +232,25 @@ public class MainActivity
         if (bearingMagNorth < 0) bearingMagNorth += 360;
 
 
+        // If just started the app, no destination has been selected.
+        if (destination == null) {
+            tvHeading.setText("Select a destination to be guided to.");
+            return;
+        }
 
         // Calculate bearing to destination based on updated bearing to north
         float newBearingToDestination = bearingTrueNorth - bearingFromNorthToDestination;
         if (newBearingToDestination < 0 ) newBearingToDestination += 360;
 
         // Output text to screen
-        String text = "Magnetic north: " + df.format(bearingMagNorth) + "\n"
-                + "True north: " + df.format(bearingTrueNorth) + "\n"
+        String text = //"Magnetic north: " + df.format(bearingMagNorth) + "\n"
+                //"Degrees to north: " + df.format(bearingTrueNorth) + "\n"
                 //+ "Geo declination: " + df.format(geoField.getDeclination()) + "\n"
                 //+ "Degrees from north to destination: " + df.format(bearingFromNorthToDestination) + "\n"
                 //+ "Degrees to destination: " + df.format(newBearingToDestination) + "\n"
-                + "Distance to destination: " + df.format(distanceToDestination) + " meters \n"
-                + "Destination: (" + df2.format(destination.getLongitude()) + ", " + df2.format(destination.getLatitude()) + ")\n";
+                "Distance to destination: " + df.format(distanceToDestination) + " meters \n"
+                //+ "Destination: (" + df2.format(destination.getLongitude()) + ", " + df2.format(destination.getLatitude()) + ")\n";
+                ;
         tvHeading.setText(text);
 
         // Try matrix.postRotate()
@@ -329,9 +343,10 @@ public class MainActivity
         myTime = myLocation.getTime();
 
 
-        bearingFromNorthToDestination = myLocation.bearingTo(destination);
-        distanceToDestination = myLocation.distanceTo(destination);
-
+        if (destination != null) {
+            bearingFromNorthToDestination = myLocation.bearingTo(destination);
+            distanceToDestination = myLocation.distanceTo(destination);
+        }
     }
 
 }

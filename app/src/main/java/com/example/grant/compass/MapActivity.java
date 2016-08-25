@@ -51,8 +51,14 @@ public class MapActivity
             public void onClick(View view) {
                 Log.i(TAG, "CLICKED NAVIGATE");
                 Bundle data = new Bundle();
-                data.putSerializable("Latitude", destination.getPosition().latitude);
-                data.putSerializable("Longitude", destination.getPosition().longitude);
+
+                if (destination != null) {
+                    data.putSerializable("Latitude", destination.getPosition().latitude);
+                    data.putSerializable("Longitude", destination.getPosition().longitude);
+                    data.putSerializable("DESTINATION_SELECTED", true);
+                } else {
+                    data.putSerializable("DESTINATION_SELECTED", false);
+                }
                 Intent intent = new Intent();
                 intent.putExtras(data);
                 setResult(RESULT_OK, intent);
